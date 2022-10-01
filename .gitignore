@@ -1,0 +1,11 @@
+.ac-php-conf.json
+.cookie.txt
+.phpunit.result.cache
+.useragent.json
+/build
+/config/*
+/debug
+/tmp
+/vendor/
+composer.lock
+dump*.sql

@@ -1,0 +1,21 @@
+#!/usr/bin/env php
+<?php
+
+if (is_file(__DIR__ . "/../vendor/autoload.php")) {
+    require_once __DIR__ . "/../vendor/autoload.php";
+} elseif(is_file(__DIR__ . "/../../../autoload.php")) {
+    require_once __DIR__ . "/../../../autoload.php";
+} else {
+    die("autoload.php not found." . PHP_EOL);
+}
+
+use Symfony\Component\Console\Application;
+use Monolog\Logger;
+use Rocketsoba\Crypto\Console\DownloadCommand;
+
+$logger = new Logger("crypto-ohlcv-downloader");
+$app = new Application("crypto-ohlcv-downloader", "0.1");
+$app->add(new DownloadCommand($logger));
+$app->setDefaultCommand("download", true);
+
+exit($app->run());

@@ -1,0 +1,43 @@
+{
+    "name": "rocketsoba/crypto-ohlcv-downloader",
+    "description": "Download OHLCV data from BitMEX or Binance API'",
+    "type": "library",
+    "authors": [
+        {
+            "name": "rockyakisoba",
+            "email": "mmtrokuroku96@gmail.com"
+        }
+    ],
+    "require": {
+        "php": ">=7.2.5",
+        "rocketsoba/curl-builder": "^0.1.1",
+        "symfony/console": "^5.4",
+        "symfony/monolog-bridge": "^5.4",
+        "monolog/monolog": "^2.8",
+        "league/csv": "^9.8"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^9.5",
+        "mockery/mockery": "^1.5"
+    },
+    "repositories": {
+        "curl-builder": {
+            "type": "vcs",
+            "url": "https://github.com/rocketsoba/curl-builder",
+            "no-api": true
+        }
+    },
+    "autoload": {
+        "psr-4": {
+            "Rocketsoba\\Crypto\\" : "src/"
+        }
+    },
+    "bin": ["crypto-ohlcv-downloade"],
+    "scripts": {
+        "test": "phpunit",
+        "update-require": "composer require --with-all-dependencies rocketsoba/curl-builder symfony/console symfony/monolog-bridge monolog/monolog && composer require --with-all-dependencies --dev phpunit/phpunit mockery/mockery",
+        "update-requires": "@update-require",
+        "update-package": "@update-require",
+        "update-packages": "@update-require"
+    }
+}
