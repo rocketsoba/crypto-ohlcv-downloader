@@ -56,6 +56,13 @@ class DownloadCommand extends Command
                  "1m"
              )
              ->addOption(
+                 "vratio",
+                 null,
+                 InputOption::VALUE_OPTIONAL,
+                 "ratio of volume",
+                 1
+             )
+             ->addOption(
                  "source",
                  null,
                  InputOption::VALUE_OPTIONAL,
@@ -82,9 +89,10 @@ class DownloadCommand extends Command
         $from     = $input->getOption("from");
         $to       = $input->getOption("to");
         $interval = $input->getOption("interval");
+        $vratio   = $input->getOption("vratio");
         $source   = $input->getOption("source");
 
-        $downloader = new OHLCVDownloader($symbol, $from, $to, $interval, $source);
+        $downloader = new OHLCVDownloader($symbol, $from, $to, $interval, $vratio, $source);
         $data = $downloader->fetchOHLCVFromBinance();
 
         /**

@@ -23,14 +23,16 @@ class OHLCVDownloader
     private $to;
     private $interval;
     private $source;
+    private $vratio;
     public $data;
 
-    public function __construct($symbol = "", $from = "", $to = "", $interval = "1m", $source = "bitmex")
+    public function __construct($symbol = "", $from = "", $to = "", $interval = "1m", $vratio = 1, $source = "bitmex")
     {
         $this->symbol   = $symbol;
         $this->from     = $from;
         $this->to       = $to;
         $this->interval = $interval;
+        $this->vratio   = $vratio;
         $this->source   = $source;
     }
 
@@ -82,7 +84,8 @@ class OHLCVDownloader
             }
 
             $reader = Reader::createFromPath($filename . ".csv", "r");
-            $ohlcv_reords = array_map(function ($value) {
+            $vratio = $this->vratio;
+            $ohlcv_reords = array_map(function ($value) use ($vratio) {
                 if (!is_numeric($value[0])) {
                     return [];
                 }
@@ -93,7 +96,7 @@ class OHLCVDownloader
                     $value[2],
                     $value[3],
                     $value[4],
-                    (int)$value[5],
+                    (int)($value[5] * $vratio),
                 ];
             }, iterator_to_array($reader->getRecords()));
             $ohlcv_reords = array_filter($ohlcv_reords);
