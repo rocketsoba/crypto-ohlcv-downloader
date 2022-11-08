@@ -8,12 +8,14 @@ use Rocketsoba\Curl\MyCurlBuilder;
 use Rocketsoba\DomParserWrapper\DomParserAdapter;
 use ZipArchive;
 use League\Csv\Reader;
+use League\Csv\Statement;
 use League\Csv\Writer;
 
 class OHLCVDownloader
 {
     private $base_url = 'https://www.bitmex.com/api/udf/history?';
     private $binance_base_url = 'https://data.binance.vision/data/futures/um/daily/klines/';
+    private $bybit_base_url = 'https://public.bybit.com/trading/';
     private $max_vars = 10080;
     private $ratelimit_limit = 30;
     private $ratelimit_remaining;
@@ -34,6 +36,205 @@ class OHLCVDownloader
         $this->interval = $interval;
         $this->vratio   = $vratio;
         $this->source   = $source;
+    }
+
+    public function fetchOHLCVFromBybit($symbol = "", $from = "", $to = "")
+    {
+        if ($symbol !== "") {
+            $this->symbol = $symbol;
+        }
+        if ($from !== "") {
+            $this->from = $from;
+        }
+        if ($to !== "") {
+            $this->to = $to;
+        }
+
+        /**
+         * Throwable
+         */
+
+        $output_filename = $this->symbol . $this->interval . ".csv";
+        $timezone = date_default_timezone_get();
+        date_default_timezone_set('UTC');
+        $ymd_from = date("Y-m-d", strtotime($this->from));
+        $unixtime_from = strtotime($this->from);
+        $unixtime_to = strtotime($this->to);
+        $range = (int)(($unixtime_to - $unixtime_from) / 86400);
+        $bybit_base_url2 = $this->bybit_base_url . $this->symbol . "/";
+
+        $writer = Writer::createFromPath(getcwd() . "/" . $output_filename, 'w+');
+        foreach (range(0, $range) as $idx1 => $val1) {
+            $filename = $this->symbol . date("Y-m-d", strtotime("+" . $val1 . "days", $unixtime_from));
+            $constructed_url = $bybit_base_url2 . $filename . ".csv.gz";
+            /**
+             * ファイルが64MB以上あるとメモリ不足になる
+             */
+            $curl_object = $this->request("GET", $constructed_url, ["file_dest" => getcwd() . "/" . $filename . ".csv.gz"]);
+            if ($curl_object->getHttpCode() !== 200) {
+                throw new Exception("Fetch sequence is failed");
+            }
+
+            /**
+             * file_put_contents(getcwd() . "/" . $filename . ".csv.gz", $curl_object->getResult());
+             */
+            $curl_object = null;
+            /**
+             * file_exists()すべき
+             */
+            $zp = gzopen(getcwd() . "/" . $filename . ".csv.gz", "rb");
+            $fp = fopen(getcwd() . "/" . $filename . ".csv", "wb");
+            while (1) {
+                $data = gzread($zp, 1048576);
+                if ($data === false || strlen($data) === 0) {
+                    break;
+                }
+                fwrite($fp, $data);
+            }
+            fclose($fp);
+            gzclose($zp);
+
+            $cmd = ['sort', '-n', getcwd() . "/" . $filename . '.csv', '-o' , getcwd() . "/" . $filename . '_2.csv'];
+            $process = proc_open($cmd, [], $pipes);
+            if ($process === false || proc_close($process) === 1) {
+                throw new Exception("Error occured while sorting");
+            }
+
+            $interval_from = strtotime("+" . $val1 . "days", $unixtime_from);
+            $interval_to = strtotime("+1min", $interval_from);
+            $reader = Reader::createFromPath(getcwd() . "/" . $filename . "_2.csv", "r");
+            $reader->setHeaderOffset(0);
+            $first_record = $reader->fetchOne(0);
+            if ($first_record["timestamp"] < $interval_from || $first_record["timestamp"] >= $interval_to) {
+                throw new Exception("First record is out of range of interval");
+            }
+
+            $data = [];
+            $current_data = [
+                "date" => date("Y.m.d", (int)$interval_from),
+                "minute" => date("H:i", (int)$interval_from),
+                "open" => $first_record["price"],
+                "high" => $first_record["price"],
+                "low" => $first_record["price"],
+                "close" => $first_record["price"],
+                "volume" => 0,
+            ];
+            if (!empty($data)) {
+                $data[count($data) - 1]["close"] = $first_record["price"];
+            }
+
+            foreach ($reader as $idx2 => $val2) {
+                if ($val2["timestamp"] >= $interval_to && $val2["timestamp"] < strtotime("+1min", $interval_to)) {
+                    $interval_from = $interval_to;
+                    $interval_to = strtotime("+1min", $interval_from);
+
+                    $current_data["close"] = $val2["price"];
+                    $data[] = $current_data;
+
+                    $current_data = [
+                        "date" => date("Y.m.d", (int)$interval_from),
+                        "minute" => date("H:i", (int)$interval_from),
+                        "open" => $val2["price"],
+                        "high" => $val2["price"],
+                        "low" => $val2["price"],
+                        "close" => $val2["price"],
+                        "volume" => 1,
+                    ];
+                    continue;
+                }
+                if ($val2["timestamp"] >= strtotime("+1min", $interval_to)) {
+                    /**
+                     * その期間内のデータがない場合
+                     */
+                    $interval_from = $interval_to;
+                    $interval_to = strtotime("+1min", $interval_from);
+
+                    $prev_price = $current_data["close"];
+                    $data[] = $current_data;
+                    /**
+                     * ここまで前の期間分
+                     */
+
+                    while (1) {
+                        if ($val2["timestamp"] >= $interval_from && $val2["timestamp"] < $interval_to) {
+                            break;
+                        }
+
+                        $data[] = [
+                            "date" => date("Y.m.d", (int)$interval_from),
+                            "minute" => date("H:i", (int)$interval_from),
+                            "open" => $prev_price,
+                            "high" => $prev_price,
+                            "low" => $prev_price,
+                            "close" => $prev_price,
+                            "volume" => 1,
+                        ];
+                        $interval_from = $interval_to;
+                        $interval_to = strtotime("+1min", $interval_from);
+                    }
+
+                    $current_data = [
+                        "date" => date("Y.m.d", (int)$interval_from),
+                        "minute" => date("H:i", (int)$interval_from),
+                        "open" => $val2["price"],
+                        "high" => $val2["price"],
+                        "low" => $val2["price"],
+                        "close" => $val2["price"],
+                        "volume" => 1,
+                    ];
+                }
+
+
+                if ($current_data["high"] < $val2["price"]) {
+                    $current_data["high"] = $val2["price"];
+                }
+                if ($current_data["low"] > $val2["price"]) {
+                    $current_data["low"] = $val2["price"];
+                }
+                $current_data["close"] = $val2["price"];
+                $current_data["volume"]++;
+                $prev = $val2;
+            }
+            if ($data[count($data) - 1]["minute"] !== $current_data["minute"]) {
+                $data[] = $current_data;
+            }
+            if (count($data) !== 1440) {
+                /**
+                 * その期間内のデータがない場合
+                 */
+                $interval_from = strtotime("+1min", $interval_from);
+
+                /**
+                 * ここまで前の期間分
+                 */
+
+                while (1) {
+                    if (count($data) === 1440) {
+                        break;
+                    }
+
+                    $data[] = [
+                        "date" => date("Y.m.d", (int)$interval_from),
+                        "minute" => date("H:i", (int)$interval_from),
+                        "open" => $data[count($data) - 1]["close"],
+                        "high" => $data[count($data) - 1]["close"],
+                        "low" => $data[count($data) - 1]["close"],
+                        "close" => $data[count($data) - 1]["close"],
+                        "volume" => 1,
+                    ];
+                    $interval_from = strtotime("+1min", $interval_from);
+                }
+            }
+            $writer->insertAll($data);
+
+            unlink(getcwd() . "/" . $filename . ".csv");
+            unlink(getcwd() . "/" . $filename . "_2.csv");
+            unlink(getcwd() . "/" . $filename . ".csv.gz");
+        }
+
+        date_default_timezone_set($timezone);
+
+        return $this;
     }
 
     public function fetchOHLCVFromBinance($symbol = "", $from = "", $to = "", $interval = "1m")
@@ -204,6 +405,9 @@ class OHLCVDownloader
         }
         if (isset($options["array_post_data"])) {
             $curl_object = $curl_object->setPostData($options["array_post_data"]);
+        }
+        if (isset($options["file_dest"])) {
+            $curl_object = $curl_object->setFilePointerMode($options["file_dest"]);
         }
 
         $curl_object = $curl_object->build();

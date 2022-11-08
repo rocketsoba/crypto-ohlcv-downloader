@@ -93,7 +93,12 @@ class DownloadCommand extends Command
         $source   = $input->getOption("source");
 
         $downloader = new OHLCVDownloader($symbol, $from, $to, $interval, $vratio, $source);
-        $data = $downloader->fetchOHLCVFromBinance();
+        if ($source === "bitmex") {
+            $data = $downloader->fetchOHLCVFromBinance();
+        }
+        if ($source === "bybit") {
+            $data = $downloader->fetchOHLCVFromBybit();
+        }
 
         /**
          * $output->writeln($data);
