@@ -51,23 +51,23 @@ class DownloadCommand extends Command
              ->addOption(
                  "interval",
                  null,
-                 InputOption::VALUE_OPTIONAL,
+                 InputOption::VALUE_REQUIRED,
                  "interval of candle",
                  "1m"
              )
              ->addOption(
                  "vratio",
                  null,
-                 InputOption::VALUE_OPTIONAL,
+                 InputOption::VALUE_REQUIRED,
                  "ratio of volume",
                  1
              )
              ->addOption(
                  "source",
                  null,
-                 InputOption::VALUE_OPTIONAL,
+                 InputOption::VALUE_REQUIRED,
                  "source",
-                 "bitmex"
+                 "binance"
              );
     }
 
@@ -93,16 +93,12 @@ class DownloadCommand extends Command
         $source   = $input->getOption("source");
 
         $downloader = new OHLCVDownloader($symbol, $from, $to, $interval, $vratio, $source);
-        if ($source === "bitmex") {
+        if ($source === "binance") {
             $data = $downloader->fetchOHLCVFromBinance();
         }
         if ($source === "bybit") {
             $data = $downloader->fetchOHLCVFromBybit();
         }
-
-        /**
-         * $output->writeln($data);
-         */
 
         return 0;
     }

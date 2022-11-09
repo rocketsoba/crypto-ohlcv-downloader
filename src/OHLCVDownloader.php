@@ -5,10 +5,8 @@ namespace Rocketsoba\Crypto;
 use Exception;
 use Rocketsoba\Curl\MyCurl;
 use Rocketsoba\Curl\MyCurlBuilder;
-use Rocketsoba\DomParserWrapper\DomParserAdapter;
 use ZipArchive;
 use League\Csv\Reader;
-use League\Csv\Statement;
 use League\Csv\Writer;
 
 class OHLCVDownloader
@@ -16,10 +14,6 @@ class OHLCVDownloader
     private $base_url = 'https://www.bitmex.com/api/udf/history?';
     private $binance_base_url = 'https://data.binance.vision/data/futures/um/daily/klines/';
     private $bybit_base_url = 'https://public.bybit.com/trading/';
-    private $max_vars = 10080;
-    private $ratelimit_limit = 30;
-    private $ratelimit_remaining;
-    private $ratelimit_reset;
     private $symbol;
     private $from;
     private $to;
@@ -28,7 +22,7 @@ class OHLCVDownloader
     private $vratio;
     public $data;
 
-    public function __construct($symbol = "", $from = "", $to = "", $interval = "1m", $vratio = 1, $source = "bitmex")
+    public function __construct($symbol = "", $from = "", $to = "", $interval = "1m", $vratio = 1, $source = "binance")
     {
         $this->symbol   = $symbol;
         $this->from     = $from;
@@ -54,7 +48,6 @@ class OHLCVDownloader
          * Throwable
          */
 
-        $output_filename = $this->symbol . $this->interval . ".csv";
         $timezone = date_default_timezone_get();
         date_default_timezone_set('UTC');
         $ymd_from = date("Y-m-d", strtotime($this->from));
@@ -62,8 +55,10 @@ class OHLCVDownloader
         $unixtime_to = strtotime($this->to);
         $range = (int)(($unixtime_to - $unixtime_from) / 86400);
         $bybit_base_url2 = $this->bybit_base_url . $this->symbol . "/";
+        $output_filename = $this->symbol . "_" . date("Ymd", $unixtime_from) . "_" . date("Ymd", $unixtime_to) . ".csv";
 
         $writer = Writer::createFromPath(getcwd() . "/" . $output_filename, 'w+');
+        $writer->setNewline("\r\n");
         foreach (range(0, $range) as $idx1 => $val1) {
             $filename = $this->symbol . date("Y-m-d", strtotime("+" . $val1 . "days", $unixtime_from));
             $constructed_url = $bybit_base_url2 . $filename . ".csv.gz";
@@ -75,9 +70,6 @@ class OHLCVDownloader
                 throw new Exception("Fetch sequence is failed");
             }
 
-            /**
-             * file_put_contents(getcwd() . "/" . $filename . ".csv.gz", $curl_object->getResult());
-             */
             $curl_object = null;
             /**
              * file_exists()すべき
@@ -119,9 +111,6 @@ class OHLCVDownloader
                 "close" => $first_record["price"],
                 "volume" => 0,
             ];
-            if (!empty($data)) {
-                $data[count($data) - 1]["close"] = $first_record["price"];
-            }
 
             foreach ($reader as $idx2 => $val2) {
                 if ($val2["timestamp"] >= $interval_to && $val2["timestamp"] < strtotime("+1min", $interval_to)) {
@@ -193,20 +182,12 @@ class OHLCVDownloader
                 }
                 $current_data["close"] = $val2["price"];
                 $current_data["volume"]++;
-                $prev = $val2;
             }
             if ($data[count($data) - 1]["minute"] !== $current_data["minute"]) {
                 $data[] = $current_data;
             }
             if (count($data) !== 1440) {
-                /**
-                 * その期間内のデータがない場合
-                 */
                 $interval_from = strtotime("+1min", $interval_from);
-
-                /**
-                 * ここまで前の期間分
-                 */
 
                 while (1) {
                     if (count($data) === 1440) {
@@ -255,9 +236,7 @@ class OHLCVDownloader
         /**
          * Throwable
          */
-        $data = [];
 
-        $output_filename = $this->symbol . $this->interval . ".csv";
         $timezone = date_default_timezone_get();
         date_default_timezone_set('UTC');
         $ymd_from = date("Y-m-d", strtotime($this->from));
@@ -265,8 +244,11 @@ class OHLCVDownloader
         $unixtime_to = strtotime($this->to);
         $range = (int)(($unixtime_to - $unixtime_from) / 86400);
         $binance_base_url2 = $this->binance_base_url . $this->symbol . "/" . $this->interval . "/";
+        $output_filename = $this->symbol . "_" . date("Ymd", $unixtime_from) . "_" . date("Ymd", $unixtime_to) . ".csv";
+        $vratio = $this->vratio;
 
-        $writer = Writer::createFromPath($output_filename, 'w+');
+        $writer = Writer::createFromPath(getcwd() . "/" . $output_filename, 'w+');
+        $writer->setNewline("\r\n");
         foreach (range(0, $range) as $idx1 => $val1) {
             $filename = $this->symbol . "-" . $this->interval . "-" . date("Y-m-d", strtotime("+" . $val1 . "days", $unixtime_from));
             $constructed_url = $binance_base_url2 . $filename . ".zip";
@@ -277,15 +259,14 @@ class OHLCVDownloader
             file_put_contents(getcwd() . "/" . $filename . ".zip", $curl_object->getResult());
 
             $zip = new ZipArchive();
-            if ($zip->open($filename . ".zip") === true) {
+            if ($zip->open(getcwd() . "/" . $filename . ".zip") === true) {
                 $zip->extractTo(getcwd());
                 $zip->close();
             } else {
                 throw new Exception("Error occurred while extrarcting zip file");
             }
 
-            $reader = Reader::createFromPath($filename . ".csv", "r");
-            $vratio = $this->vratio;
+            $reader = Reader::createFromPath(getcwd() . "/" . $filename . ".csv", "r");
             $ohlcv_reords = array_map(function ($value) use ($vratio) {
                 if (!is_numeric($value[0])) {
                     return [];
@@ -303,8 +284,8 @@ class OHLCVDownloader
             $ohlcv_reords = array_filter($ohlcv_reords);
             $writer->insertAll($ohlcv_reords);
 
-            unlink($filename . ".csv");
-            unlink($filename . ".zip");
+            unlink(getcwd() . "/" . $filename . ".csv");
+            unlink(getcwd() . "/" . $filename . ".zip");
         }
 
         date_default_timezone_set($timezone);
@@ -312,6 +293,9 @@ class OHLCVDownloader
         return $this;
     }
 
+    /**
+     * @todo 現在使用不可
+     */
     public function fetchOHLCVFromBitmex($symbol = "", $from = "", $to = "", $interval = "1m")
     {
         if ($symbol !== "") {

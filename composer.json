@@ -32,10 +32,10 @@
             "Rocketsoba\\Crypto\\" : "src/"
         }
     },
-    "bin": ["crypto-ohlcv-downloade"],
+    "bin": ["bin/crypto-ohlcv-downloader"],
     "scripts": {
         "test": "phpunit",
-        "update-require": "composer require --with-all-dependencies rocketsoba/curl-builder symfony/console symfony/monolog-bridge monolog/monolog && composer require --with-all-dependencies --dev phpunit/phpunit mockery/mockery",
+        "update-require": "composer require --with-all-dependencies rocketsoba/curl-builder symfony/console symfony/monolog-bridge monolog/monolog league/csv && composer require --with-all-dependencies --dev phpunit/phpunit mockery/mockery",
         "update-requires": "@update-require",
         "update-package": "@update-require",
         "update-packages": "@update-require"
