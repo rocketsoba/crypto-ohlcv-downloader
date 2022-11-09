@@ -20,9 +20,10 @@ class OHLCVDownloader
     private $interval;
     private $source;
     private $vratio;
+    private $base_csv;
     public $data;
 
-    public function __construct($symbol = "", $from = "", $to = "", $interval = "1m", $vratio = 1, $source = "binance")
+    public function __construct($symbol = "", $from = "", $to = "", $interval = "1m", $vratio = 1, $source = "binance", $base_csv = "")
     {
         $this->symbol   = $symbol;
         $this->from     = $from;
@@ -30,6 +31,7 @@ class OHLCVDownloader
         $this->interval = $interval;
         $this->vratio   = $vratio;
         $this->source   = $source;
+        $this->base_csv = $base_csv;
     }
 
     public function fetchOHLCVFromBybit($symbol = "", $from = "", $to = "")
@@ -59,7 +61,38 @@ class OHLCVDownloader
 
         $writer = Writer::createFromPath(getcwd() . "/" . $output_filename, 'w+');
         $writer->setNewline("\r\n");
+
+        if ($this->base_csv !== "" && file_exists($this->base_csv)) {
+            $base_csv_iterator = Reader::createFromPath($this->base_csv, "r")->getIterator();
+            $base_csv_iterator->rewind();
+        }
+
         foreach (range(0, $range) as $idx1 => $val1) {
+            if (isset($base_csv_iterator) && $base_csv_iterator->valid()) {
+                $date = date("Y.m.d", strtotime("+" . $val1 . "days", $unixtime_from));
+                $data = [];
+                $found_flag = false;
+                while (1) {
+                    if (!$base_csv_iterator->valid()) {
+                        break;
+                    }
+                    $base_csv_current = $base_csv_iterator->current();
+                    if ($base_csv_current[0] === $date) {
+                        $found_flag = true;
+                        $data[] = $base_csv_current;
+                    } else {
+                        if ($found_flag) {
+                            break;
+                        }
+                    }
+                    $base_csv_iterator->next();
+                }
+                if (!empty($data)) {
+                    $writer->insertAll($data);
+                    continue;
+                }
+            }
+
             $filename = $this->symbol . date("Y-m-d", strtotime("+" . $val1 . "days", $unixtime_from));
             $constructed_url = $bybit_base_url2 . $filename . ".csv.gz";
             /**
@@ -77,11 +110,11 @@ class OHLCVDownloader
             $zp = gzopen(getcwd() . "/" . $filename . ".csv.gz", "rb");
             $fp = fopen(getcwd() . "/" . $filename . ".csv", "wb");
             while (1) {
-                $data = gzread($zp, 1048576);
-                if ($data === false || strlen($data) === 0) {
+                $decompressed_data = gzread($zp, 1048576);
+                if ($decompressed_data === false || strlen($decompressed_data) === 0) {
                     break;
                 }
-                fwrite($fp, $data);
+                fwrite($fp, $decompressed_data);
             }
             fclose($fp);
             gzclose($zp);
@@ -249,7 +282,37 @@ class OHLCVDownloader
 
         $writer = Writer::createFromPath(getcwd() . "/" . $output_filename, 'w+');
         $writer->setNewline("\r\n");
+
+        if ($this->base_csv !== "" && file_exists($this->base_csv)) {
+            $base_csv_iterator = Reader::createFromPath($this->base_csv, "r")->getIterator();
+            $base_csv_iterator->rewind();
+        }
+
         foreach (range(0, $range) as $idx1 => $val1) {
+            if (isset($base_csv_iterator) && $base_csv_iterator->valid()) {
+                $date = date("Y.m.d", strtotime("+" . $val1 . "days", $unixtime_from));
+                $data = [];
+                $found_flag = false;
+                while (1) {
+                    if (!$base_csv_iterator->valid()) {
+                        break;
+                    }
+                    $base_csv_current = $base_csv_iterator->current();
+                    if ($base_csv_current[0] === $date) {
+                        $found_flag = true;
+                        $data[] = $base_csv_current;
+                    } else {
+                        if ($found_flag) {
+                            break;
+                        }
+                    }
+                    $base_csv_iterator->next();
+                }
+                if (!empty($data)) {
+                    $writer->insertAll($data);
+                    continue;
+                }
+            }
             $filename = $this->symbol . "-" . $this->interval . "-" . date("Y-m-d", strtotime("+" . $val1 . "days", $unixtime_from));
             $constructed_url = $binance_base_url2 . $filename . ".zip";
             $curl_object = $this->request("GET", $constructed_url);

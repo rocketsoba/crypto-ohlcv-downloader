@@ -68,6 +68,13 @@ class DownloadCommand extends Command
                  InputOption::VALUE_REQUIRED,
                  "source",
                  "binance"
+             )
+             ->addOption(
+                 "base_csv",
+                 null,
+                 InputOption::VALUE_REQUIRED,
+                 "if this csv contains matched duration, skip download",
+                 ""
              );
     }
 
@@ -91,8 +98,9 @@ class DownloadCommand extends Command
         $interval = $input->getOption("interval");
         $vratio   = $input->getOption("vratio");
         $source   = $input->getOption("source");
+        $base_csv = $input->getOption("base_csv");
 
-        $downloader = new OHLCVDownloader($symbol, $from, $to, $interval, $vratio, $source);
+        $downloader = new OHLCVDownloader($symbol, $from, $to, $interval, $vratio, $source, $base_csv);
         if ($source === "binance") {
             $data = $downloader->fetchOHLCVFromBinance();
         }
