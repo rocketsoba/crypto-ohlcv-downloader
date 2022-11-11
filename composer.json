@@ -1,6 +1,6 @@
 {
     "name": "rocketsoba/crypto-ohlcv-downloader",
-    "description": "Download OHLCV data from BitMEX or Binance API'",
+    "description": "Download OHLCV data from crypto broker (Binance, Bybit)",
     "type": "library",
     "authors": [
         {

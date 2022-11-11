@@ -31,49 +31,49 @@ class DownloadCommand extends Command
                  "symbol",
                  null,
                  InputOption::VALUE_REQUIRED,
-                 "symbol",
+                 "symbol [required] [example:\"BTCUSDT\"]",
                  ""
              )
              ->addOption(
                  "from",
                  null,
                  InputOption::VALUE_REQUIRED,
-                 "from",
+                 "from [required] [example:\"2022-01-01\"]",
                  ""
              )
              ->addOption(
                  "to",
                  null,
                  InputOption::VALUE_REQUIRED,
-                 "to",
+                 "to [required] [example:\"2022-01-31\"]",
                  ""
              )
              ->addOption(
                  "interval",
                  null,
                  InputOption::VALUE_REQUIRED,
-                 "interval of candle",
+                 "interval of candle [optional]",
                  "1m"
              )
              ->addOption(
                  "vratio",
                  null,
                  InputOption::VALUE_REQUIRED,
-                 "ratio of volume",
+                 "ratio of volume [optional]",
                  1
              )
              ->addOption(
                  "source",
                  null,
                  InputOption::VALUE_REQUIRED,
-                 "source",
+                 "source [optional]",
                  "binance"
              )
              ->addOption(
                  "base_csv",
                  null,
                  InputOption::VALUE_REQUIRED,
-                 "if this csv contains matched duration, skip download",
+                 "if this csv contains matched duration, skip download [optional]",
                  ""
              );
     }
